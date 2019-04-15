@@ -28,18 +28,18 @@ def progress_bar(pos, total, length=50):
     return '[{}]'.format(done+todo)
 
 
-def create_Net(net, nb_hidden, seed=None):
+def create_Net(param):
     """
     Return a Net from one of the availables classes
     """        
-    if net == 'Net1':
-        return Net1(nb_hidden)
-    elif net == 'Net2': 
-        return Net2(nb_hidden)
-    elif net == 'LeNet4':
-        return LeNet4(nb_hidden)
-    elif net == 'LeNet5':
-        return LeNet5(nb_hidden)
+    if param['net'] == 'Net1':
+        return Net1(param)
+    elif param['net'] == 'Net2': 
+        return Net2(param)
+    elif param['net'] == 'LeNet4':
+        return LeNet4(param)
+    elif param['net'] == 'LeNet5':
+        return LeNet5(param)
     else:
         raise NotImplementedError
 
@@ -112,7 +112,7 @@ def compare_digits(classes):
     return ( diff - diff.abs() ).div(2).add(1).int()
 
 
-def grid_search(net='Net2', param='epoch', rg=[10, 100], step=10):
+def grid_search(param, optimize='epoch', rg=[10, 100], step=10):
     """
     Does a grid search on a Net optimising for a given parameters
     """
@@ -135,16 +135,16 @@ def grid_search(net='Net2', param='epoch', rg=[10, 100], step=10):
     test_input /= test_input.max()  
     
     # Sets default
-    nb_hidden, nb_epochs, mini_batch_size = 100, 30, 20
+    nb_hidden, nb_epochs, mini_batch_size = param['hidden'], param['epochs'], param['batch_size']
     
-    print("Grid search, Net: {}, optimising: {}, {}->{} step: {}".format(net, param, rg[0], rg[-1], step), end='\n')   
+    print("Grid search, Net: {}, optimising: {}, {}->{} step: {}".format(param['net'], optimize, rg[0], rg[-1], step), end='\n')   
     
     class_accuracy = []
     comp_accuracy = []
     
-    if param == 'epoch':
+    if optimize == 'epoch':
         # Chooses the Net to test    
-        model = create_Net(net, nb_hidden)
+        model = create_Net(param)
         
         epochs = get_range_param(rg, step)
         for i, e in enumerate(epochs):
@@ -162,15 +162,16 @@ def grid_search(net='Net2', param='epoch', rg=[10, 100], step=10):
         plt.plot(epochs, comp_accuracy)
         plt.legend(['Classification accuracy', 'Comparison accuracy'])
         plt.xlabel('# epochs'); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(net, param)))
+        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
         plt.show()
         
-    elif param == 'hidden_layer_size':
+    elif optimize == 'hidden_layer_size':
         sizes = get_range_param(rg, step)
         for i, s in enumerate(sizes):
             print("\rhd size: {} {}".format(s, progress_bar(2*i, len(sizes)*2-1)), end='')
             # Creates modle with s hidden layers
-            model = create_Net(net, s)
+            param['hidden'] = s
+            model = create_Net(param)
             train_with_set_params(model, nb_epochs, mini_batch_size)
             print("\rhd size: {} {}".format(s, progress_bar(2*i+1, len(sizes)*2-1)), end='')
             metrics = test_model(model, test_input, test_target, test_class)
@@ -182,11 +183,11 @@ def grid_search(net='Net2', param='epoch', rg=[10, 100], step=10):
         plt.plot(sizes, comp_accuracy)
         plt.legend(['Classification accuracy', 'Comparison accuracy'])
         plt.xlabel('# hidden layers'); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(net, param)))
+        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
         plt.show()
             
-    elif param == 'mini_batch_size':
-        model = create_Net(net, nb_hidden)
+    elif optimize == 'mini_batch_size':
+        model = create_Net(param)
         for i, s in enumerate(rg):
             print("\rmb size: {} {}".format(s, progress_bar(2*i, len(rg)*2-1)), end='')
             train_with_set_params(model, nb_epochs, s)
@@ -201,14 +202,16 @@ def grid_search(net='Net2', param='epoch', rg=[10, 100], step=10):
         plt.plot(rg, comp_accuracy)
         plt.legend(['Classification accuracy', 'Comparison accuracy'])
         plt.xlabel('Mini batch size'); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(net, param)))
+        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
         plt.show()
         
     else:
         raise NotImplementedError
         
 
-def test_param(net, nb_hidden, nb_epochs, mini_batch_size):
+def test_param(param):
+    
+    print("Testing: {}".format(param['net']))
     
     train_input, train_target, train_class, test_input, test_target, test_class = \
         prologue.generate_pair_sets(N_PAIRS)
@@ -217,17 +220,17 @@ def test_param(net, nb_hidden, nb_epochs, mini_batch_size):
     train_input /= train_input.max()
     test_input /= test_input.max()
 
-    model = create_Net(net, nb_hidden)    
+    model = create_Net(param)    
     model.train(True)
     for i in [0, 1]:
         train_model(model, Variable(train_input[:, i, :, :].view(-1, 1, 14, 14)), 
-                           Variable(train_class[:, i].long()), mini_batch_size, nb_epochs)
+                           Variable(train_class[:, i].long()), param['batch_size'], param['epochs'])
     
     model.train(False)
     nb_test_errors = 0               
     for i in [0, 1]:
         nb_test_errors += compute_nb_errors(model, Variable(test_input[:, i, :, :].view(-1, 1, 14, 14)), 
-                                            Variable(test_class[:, i].long()), mini_batch_size)    
+                                            Variable(test_class[:, i].long()), 20)    
     
     print('Classification test error: {:0.2f}% {:d}/{:d}'.format( nb_test_errors / test_input.size(0) /2*100, 
                                                                   nb_test_errors, 2*test_input.size(0)))
@@ -257,7 +260,7 @@ def boosted_Net(net_dicts):
         print("Net {}/{}: {}".format(i+1, len(net_dicts), dic['net']))
         # Sets a different seed for each net
         torch.manual_seed(dic['seed'])
-        model = create_Net(dic['net'], dic['hidden'])
+        model = create_Net(dic)
         # Training each of the models
         model.train(True)
         for i in [0, 1]:                
@@ -289,16 +292,20 @@ def boosted_Net(net_dicts):
 
 
 def main():
-#    torch.manual_seed(0)
-#    grid_search(net='LeNet4', param='hidden_layer_size', rg=[50, 1000], step=50)
-    
-#    net_dicts = []
-#    for i in range(3):
-#        net_dicts.append({'net': 'Net2', 'hidden': 120, 'epochs': 30, 'batch_size': 20, 'seed': i+1})        
-#    boosted_Net(net_dicts)
-    
     torch.manual_seed(0)
-    test_param(net='Net2', nb_hidden=200, nb_epochs=80, mini_batch_size=20)
+    net =  {"net": 'Net2', "hidden": 500, "epochs": 80, "batch_size": 20, "pool": 'max', "activation": 'relu', "seed": 0}
+    
+    grid_search(net ,optimize='epoch', rg=[10, 20], step=10)
+    
+
+#    torch.manual_seed(0)
+
+#    test_param(net)
+#    nets = []
+#    for i in range(3):
+#        nets.append({"net": "LeNet4", "hidden": 200, "epochs": 80, "batch_size": 20, "pool": "avg", "activation": "tanh", "seed": i})
+#    boosted_Net(nets)
+    
 
 
 if __name__ == '__main__':
