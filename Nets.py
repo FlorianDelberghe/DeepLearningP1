@@ -42,15 +42,16 @@ class Net2(nn.Module):
     NN model similar to Net1 w/ dropout
     """
     def __init__(self, param):
+        # best: param['drop_proba'] = [0.05, 0.05, 0.5, 0.2]
         super(Net2, self).__init__()
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3)
-        self.drop_conv1 = nn.Dropout2d(0.05)
+        self.drop_conv1 = nn.Dropout2d(param['drop_proba'][0])
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3)
-        self.drop_conv2 = nn.Dropout2d(0.05)
+        self.drop_conv2 = nn.Dropout2d(param['drop_proba'][1])
         self.fc1 = nn.Linear(256, param['hidden'])
-        self.drop1 = nn.Dropout(0.5)
+        self.drop1 = nn.Dropout(param['drop_proba'][2])
         self.fc2 = nn.Linear(param['hidden'], 10)
-        self.drop2 = nn.Dropout(0.2)
+        self.drop2 = nn.Dropout(param['drop_proba'][3])
         
         if param['activation'] == 'tanh':
             self.activation = F.tanh
@@ -84,7 +85,9 @@ class LeNet4(nn.Module):
         self.conv2 = nn.Conv2d(4, 16, kernel_size=3) #16*10*10
         self.conv3 = nn.Conv2d(16, 120, kernel_size=2) #120*1*1
         self.fc1 =  nn.Linear(120, param['hidden']) #flat fc 120->120
+        self.drop1 = nn.Dropout(param['drop_proba'][2])
         self.fc2 = nn.Linear(param['hidden'], 10) #flat fc 120->10
+        self.drop2 = nn.Dropout(param['drop_proba'][3])
         
         if param['activation'] == 'tanh':
             self.activation = F.tanh
@@ -104,8 +107,8 @@ class LeNet4(nn.Module):
         x = self.activation(self.pool(self.conv1(x), kernel_size=2, stride=2)) 
         x = self.activation(self.pool(self.conv2(x), kernel_size=2, stride=2))
         x = self.activation(self.conv3(x))
-        x = self.activation(self.fc1(x.view(-1, 120)))
-        x = self.fc2(x)
+        x = self.activation(self.fc1(self.drop1(x.view(-1, 120))))
+        x = self.fc2(self.drop2(x))
         return x
     
     
@@ -119,8 +122,11 @@ class LeNet5(nn.Module):
         self.conv2 = nn.Conv2d(6, 16, kernel_size=3)
         self.conv3 = nn.Conv2d(16, 120, kernel_size=2)
         self.fc1 =  nn.Linear(120, 120)
+        self.drop1 = nn.Dropout(param['drop_proba'][2])
         self.fc2 = nn.Linear(120, param['hidden'])
+        self.drop2 = nn.Dropout(param['drop_proba'][3])
         self.fc3 = nn.Linear(param['hidden'], 10)
+        self.drop3 = nn.Dropout(param['drop_proba'][4])
         
         if param['activation'] == 'tanh':
             self.activation = F.tanh
@@ -143,8 +149,8 @@ class LeNet5(nn.Module):
         x = self.activation(self.pool(self.conv1(x), kernel_size=2, stride=2))
         x = self.activation(self.pool(self.conv2(x), kernel_size=2, stride=2))
         x = self.activation(self.conv3(x))
-        x = self.activation(self.fc1(x.view(-1, 120)))
-        x = self.activation(self.fc2(x))
-        x = self.fc3(x)
+        x = self.activation(self.fc1(self.drop1(x.view(-1, 120))))
+        x = self.activation(self.fc2(self.drop2(x)))
+        x = self.fc3(self.drop3(x))
         return x
     

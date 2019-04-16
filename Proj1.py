@@ -112,12 +112,13 @@ def compare_digits(classes):
     return ( diff - diff.abs() ).div(2).add(1).int()
 
 
-def grid_search(param, optimize='epoch', rg=[10, 100], step=10):
+def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
     """
     Does a grid search on a Net optimising for a given parameters
     """
     def get_range_param(rg, step):
         return [i*step+rg[0] for i in range(int((rg[1]-rg[0]) / step)+1)]
+
     
     def train_with_set_params(model, nb_epochs, mini_batch_size):          
         model.train(True)
@@ -142,10 +143,8 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10):
     class_accuracy = []
     comp_accuracy = []
     
-    if optimize == 'epoch':
-        # Chooses the Net to test    
-        model = create_Net(param)
-        
+    if optimize == 'epoch':   
+        model = create_Net(param)        
         epochs = get_range_param(rg, step)
         for i, e in enumerate(epochs):
             print("\r{} epochs {}".format(e, progress_bar(2*i, len(epochs)*2-1)), end='')
@@ -167,6 +166,7 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10):
         
     elif optimize == 'hidden_layer_size':
         sizes = get_range_param(rg, step)
+        print(sizes)
         for i, s in enumerate(sizes):
             print("\rhd size: {} {}".format(s, progress_bar(2*i, len(sizes)*2-1)), end='')
             # Creates modle with s hidden layers
@@ -205,13 +205,37 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10):
         plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
         plt.show()
         
+    elif optimize == 'drop_proba':
+        probas = get_range_param(rg, step)
+        for i, p in enumerate(probas):
+            param['drop_proba'][level] = p
+            model = create_Net(param)
+            print("\rdrop proba level {}: {}".format(level, progress_bar(2*i, len(probas)*2-1)), end='')
+            train_with_set_params(model, nb_epochs, mini_batch_size)
+            print("\rdrop proba level {}: {}".format(level, progress_bar(2*i+1, len(probas)*2-1)), end='')
+            # training batch size is irrelevant for the test
+            metrics = test_model(model, test_input, test_target, test_class)
+            class_accuracy.append(metrics[1])
+            comp_accuracy.append(metrics[3])
+        
+        plt.figure(figsize=(5, 3))
+        plt.plot(probas, class_accuracy)
+        plt.plot(probas, comp_accuracy)
+        plt.legend(['Classification accuracy', 'Comparison accuracy'])
+        plt.xlabel('Drop proba @ level {}'.format(level)); plt.ylabel('Accuracy');
+        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
+        plt.show()
+        
     else:
         raise NotImplementedError
         
 
 def test_param(param):
     
-    print("Testing: {}".format(param['net']))
+    print("Testing...", end='')
+    for k in param.keys():
+        print(" {}: {} |".format(k, param[k]), end='')
+    print('')    
     
     train_input, train_target, train_class, test_input, test_target, test_class = \
         prologue.generate_pair_sets(N_PAIRS)
@@ -293,20 +317,21 @@ def boosted_Net(net_dicts):
 
 def main():
     torch.manual_seed(0)
-    net =  {"net": 'Net2', "hidden": 500, "epochs": 80, "batch_size": 20, "pool": 'max', "activation": 'relu', "seed": 0}
+    net2 =  {"net": 'Net2', "hidden": 120, "epochs": 80, "batch_size": 20, "pool": 'max', "activation": 'relu', "drop_proba": [0.05, 0.05, 0.5, 0.2], "seed": 0}
+    net4 =  {"net": 'LeNet4', "hidden": 350, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.0, 0.0, 0.1], "seed": 1}
     
-    grid_search(net ,optimize='epoch', rg=[10, 20], step=10)
+    net5 =  {"net": 'LeNet5', "hidden": 250, "epochs": 30, "batch_size": 20, "pool": 'avg', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.2, 0.25, 0.15], "seed": 0}
+    net5 =  {"net": 'LeNet5', "hidden": 120, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'relu', "drop_proba": [0.0, 0.0, 0.0, 0.0], "seed": 0}
     
+#    grid_search(net4 ,optimize='hidden_layer_size', rg=[10, 80], step=10)
 
-#    torch.manual_seed(0)
-
-#    test_param(net)
+    test_param(net4)
+    
 #    nets = []
 #    for i in range(3):
-#        nets.append({"net": "LeNet4", "hidden": 200, "epochs": 80, "batch_size": 20, "pool": "avg", "activation": "tanh", "seed": i})
-#    boosted_Net(nets)
+#        nets.append({"net": 'LeNet4', "hidden": 350, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.0, 0.0, 0.1], "seed": i})
+#    boosted_Net(nets) 
     
-
 
 if __name__ == '__main__':
     main()
