@@ -8,7 +8,7 @@ from torch import nn
 import os
 
 import torchvision
-from Nets import Net1, Net2, LeNet4, LeNet5
+from Nets import *
 import dlc_practical_prologue as prologue
 import matplotlib.pyplot as plt
 import xgboost as xgb
@@ -40,6 +40,10 @@ def create_Net(param):
         return LeNet4(param)
     elif param['net'] == 'LeNet5':
         return LeNet5(param)
+    elif param['net'] == 'compNet2':
+        return compNet2(param)
+    elif param['net'] == 'compNet4':
+        return compNet4(param)
     else:
         raise NotImplementedError
 
@@ -60,7 +64,7 @@ def train_model(model, train_input, train_target, mini_batch_size, nb_epoch=40, 
     for i in range(nb_epoch):
         for b in range(0, train_input.size(0), mini_batch_size):
             output = model(train_input.narrow(0, b, mini_batch_size))
-            loss = criterion(output, train_target.narrow(0, b, mini_batch_size))            
+            loss = criterion(output, train_target.narrow(0, b, mini_batch_size))     
             model.zero_grad()
             loss.backward()
             optimizer.step() 
@@ -72,7 +76,6 @@ def compute_nb_errors(model, input, target, mini_batch_size):
     """
     Computes the number of errors between a tartget vector and the model prediction usung input
     """
-    model.train(False)
     nb_errors = 0
 
     for b in range(0, input.size(0), mini_batch_size):
@@ -90,11 +93,10 @@ def test_model(model, test_input, test_target, test_class):
     Evaluates teh model with classification and comparison
     """
     model.train(False)
-    mini_batch_size = 20
     class_err = 0               
     for i in [0, 1]:
         class_err += compute_nb_errors(model, Variable(test_input[:, i, :, :].view(-1, 1, 14, 14)), 
-                                              Variable(test_class[:, i].long()), mini_batch_size)  
+                                              Variable(test_class[:, i].long()), 20)  
         
     pred_class = torch.stack([model(Variable(test_input[:, 0, :, :].view(-1, 1, 14, 14))).data.max(1)[1], 
                               model(Variable(test_input[:, 1, :, :].view(-1, 1, 14, 14))).data.max(1)[1]], dim=1)
@@ -118,7 +120,6 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
     """
     def get_range_param(rg, step):
         return [i*step+rg[0] for i in range(int((rg[1]-rg[0]) / step)+1)]
-
     
     def train_with_set_params(model, nb_epochs, mini_batch_size):          
         model.train(True)
@@ -126,7 +127,16 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
                 train_model(model, Variable(train_input[:, i, :, :].view(-1, 1, 14, 14)), 
                             Variable(train_class[:, i].long()), mini_batch_size, nb_epochs, progress=False)
         model.train(False)
-            
+        
+    def save_figure(x_plot, y_plot, legend, ax_labels, title, filename):        
+        plt.figure(figsize=(5, 3))
+        for i, y in enumerate(y_plot):
+            plt.plot(x_plot, y, label=legend[i])            
+        plt.legend()
+        plt.xlabel(ax_labels[0]); plt.ylabel(ax_labels[1]);
+        plt.savefig(os.path.join('figs', filename))
+        plt.show()   
+        
             
     # Imports the data  
     train_input, train_target, train_class, test_input, test_target, test_class = \
@@ -155,18 +165,13 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
             metrics = test_model(model, test_input, test_target, test_class)
             class_accuracy.append(metrics[1])
             comp_accuracy.append(metrics[3])            
-            
-        plt.figure(figsize=(5, 3))
-        plt.plot(epochs, class_accuracy)
-        plt.plot(epochs, comp_accuracy)
-        plt.legend(['Classification accuracy', 'Comparison accuracy'])
-        plt.xlabel('# epochs'); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
-        plt.show()
+         
+        save_figure(x_plot=epochs, y_plot=[class_accuracy, comp_accuracy], 
+                legend=['Classification accuracy', 'Comparison accuracy'], 
+                ax_labels=['# epochs', 'Accuracy'], title='', filename="GS{}{}.png".format(param['net'], optimize))
         
     elif optimize == 'hidden_layer_size':
         sizes = get_range_param(rg, step)
-        print(sizes)
         for i, s in enumerate(sizes):
             print("\rhd size: {} {}".format(s, progress_bar(2*i, len(sizes)*2-1)), end='')
             # Creates modle with s hidden layers
@@ -178,13 +183,9 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
             class_accuracy.append(metrics[1])
             comp_accuracy.append(metrics[3])            
             
-        plt.figure(figsize=(5, 3))
-        plt.plot(sizes, class_accuracy)
-        plt.plot(sizes, comp_accuracy)
-        plt.legend(['Classification accuracy', 'Comparison accuracy'])
-        plt.xlabel('# hidden layers'); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
-        plt.show()
+        save_figure(x_plot=sizes, y_plot=[class_accuracy, comp_accuracy], 
+                    legend=['Classification accuracy', 'Comparison accuracy'], 
+                    ax_labels=['# hidden layers', 'Accuracy'], title='', filename="GS{}{}.png".format(param['net'], optimize))        
             
     elif optimize == 'mini_batch_size':
         model = create_Net(param)
@@ -196,14 +197,10 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
             metrics = test_model(model, test_input, test_target, test_class)
             class_accuracy.append(metrics[1])
             comp_accuracy.append(metrics[3])
-        
-        plt.figure(figsize=(5, 3))
-        plt.plot(rg, class_accuracy)
-        plt.plot(rg, comp_accuracy)
-        plt.legend(['Classification accuracy', 'Comparison accuracy'])
-        plt.xlabel('Mini batch size'); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
-        plt.show()
+            
+        save_figure(x_plot=rg, y_plot=[class_accuracy, comp_accuracy], 
+                    legend=['Classification accuracy', 'Comparison accuracy'], 
+                    ax_labels=['Mini batch size', 'Accuracy'], title='', filename="GS{}{}.png".format(param['net'], optimize))
         
     elif optimize == 'drop_proba':
         probas = get_range_param(rg, step)
@@ -217,14 +214,10 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
             metrics = test_model(model, test_input, test_target, test_class)
             class_accuracy.append(metrics[1])
             comp_accuracy.append(metrics[3])
-        
-        plt.figure(figsize=(5, 3))
-        plt.plot(probas, class_accuracy)
-        plt.plot(probas, comp_accuracy)
-        plt.legend(['Classification accuracy', 'Comparison accuracy'])
-        plt.xlabel('Drop proba @ level {}'.format(level)); plt.ylabel('Accuracy');
-        plt.savefig(os.path.join('figs', "GS{}{}.png".format(param['net'], optimize)))
-        plt.show()
+            
+        save_figure(x_plot=probas, y_plot=[class_accuracy, comp_accuracy], 
+                    legend=['Classification accuracy', 'Comparison accuracy'], 
+                    ax_labels=['Drop proba @ level {}', 'Accuracy'], title='', filename="GS{}{}.png".format(param['net'], optimize))
         
     else:
         raise NotImplementedError
@@ -243,14 +236,20 @@ def test_param(param):
     # Normalization of the data
     train_input /= train_input.max()
     test_input /= test_input.max()
-
-    model = create_Net(param)    
+    
+    # setting a random seed
+    if param['seed'] != None:
+        torch.manual_seed(param['seed'])
+        
+    model = create_Net(param)  
     model.train(True)
     for i in [0, 1]:
         train_model(model, Variable(train_input[:, i, :, :].view(-1, 1, 14, 14)), 
                            Variable(train_class[:, i].long()), param['batch_size'], param['epochs'])
     
     model.train(False)
+    #TODO this is temp otherwise 2x computation
+#    nb_test_errors, _, _, _ = test_model(model, test_input, test_target, test_class)
     nb_test_errors = 0               
     for i in [0, 1]:
         nb_test_errors += compute_nb_errors(model, Variable(test_input[:, i, :, :].view(-1, 1, 14, 14)), 
@@ -266,6 +265,8 @@ def test_param(param):
           (compare_digits(pred_class) - test_target.int()).abs().sum().item(), 
           test_input.size(0)))
     
+    del model
+    
 
 def boosted_Net(net_dicts):
     """
@@ -279,11 +280,17 @@ def boosted_Net(net_dicts):
     train_input /= train_input.max()
     test_input /= test_input.max()
     
-    pred_tr = []; pred_te= [];
+    pred_tr = []; pred_te = [];
     for i, dic in enumerate(net_dicts):
-        print("Net {}/{}: {}".format(i+1, len(net_dicts), dic['net']))
-        # Sets a different seed for each net
-        torch.manual_seed(dic['seed'])
+        print("Net {}/{}".format(i+1, len(net_dicts)))
+        for k in dic.keys():
+            print(" {}: {} |".format(k, dic[k]), end='')
+        print('')
+        
+        # setting a random seed
+        if dic['seed'] != None:
+            torch.manual_seed(dic['seed'])
+            
         model = create_Net(dic)
         # Training each of the models
         model.train(True)
@@ -304,8 +311,10 @@ def boosted_Net(net_dicts):
             
         pred_tr.append(torch.cat(output_tr))
         pred_te.append(torch.cat(output_te))
+        
+        del model
 
-    target = torch.cat([train_class[:,0], train_class[:,1]])#.reshape((train_class.size(0)*2, 1))
+    target = torch.cat([train_class[:,0], train_class[:,1]])
     boost_model = xgb.XGBClassifier().fit(torch.stack(pred_tr, 1), target)
     boost_pred = boost_model.predict(torch.stack(pred_te, 1))
     
@@ -317,23 +326,25 @@ def boosted_Net(net_dicts):
 
 def main():
     torch.manual_seed(0)
-    net2 =  {"net": 'Net2', "hidden": 120, "epochs": 80, "batch_size": 20, "pool": 'max', "activation": 'relu', "drop_proba": [0.05, 0.05, 0.5, 0.2], "seed": 0}
-    net4 =  {"net": 'LeNet4', "hidden": 350, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.0, 0.0, 0.1], "seed": 1}
+    
+    net2 =  {"net": 'Net2', "hidden": 120, "epochs": 80, "batch_size": 20, 
+             "pool": 'max', "activation": 'relu', "drop_proba": [0.05, 0.05, 0.5, 0.2], "seed": None}
+    net4 =  {"net": 'LeNet4', "hidden": 350, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.0, 0.0, 0.1], "seed": None}
     
     net5 =  {"net": 'LeNet5', "hidden": 250, "epochs": 30, "batch_size": 20, "pool": 'avg', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.2, 0.25, 0.15], "seed": 0}
     net5 =  {"net": 'LeNet5', "hidden": 120, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'relu', "drop_proba": [0.0, 0.0, 0.0, 0.0], "seed": 0}
     
-#    grid_search(net4 ,optimize='hidden_layer_size', rg=[10, 80], step=10)
+#    grid_search(net4 ,optimize='epoch', rg=[10, 20], step=10)
 
     test_param(net4)
     
 #    nets = []
-#    for i in range(3):
-#        nets.append({"net": 'LeNet4', "hidden": 350, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.0, 0.0, 0.1], "seed": i})
+#    for i in range(4):
+#        nets.append(net2)
 #    boosted_Net(nets) 
     
 
-if __name__ == '__main__':
+if __name__ == '__main__':    
     main()
     
 
