@@ -170,9 +170,9 @@ class compNet2(nn.Module):
         self.fc2 = nn.Linear(param['hidden'], 10)
         self.drop2 = nn.Dropout(param['drop_proba'][3])
         
-        self.fc3 = nn.Linear(20, 40)
-        self.fc4 = nn.Linear(40, 10)
-        self.fc5 = nn.Linear(10, 2)
+        self.fc3 = nn.Linear(20, 60)
+        self.fc4 = nn.Linear(60, 90)
+        self.fc5 = nn.Linear(90, 2)
         
         self.fcnaive = nn.Linear(2, 2)
         
@@ -232,14 +232,17 @@ class compNet4(nn.Module):
         self.fc2 = nn.Linear(param['hidden'], 10) #flat fc 120->10
         self.drop2 = nn.Dropout(param['drop_proba'][3])
         
-        self.fc3 = nn.Linear(20, 30)
-        self.fc4 = nn.Linear(30, 10)
-        self.fc5 = nn.Linear(10, 2)
+        self.drop3 = nn.Dropout(param['drop_proba'][4])
+        self.fc3 = nn.Linear(20, 60)
+        self.drop4 = nn.Dropout(param['drop_proba'][5])
+        self.fc4 = nn.Linear(60, 90)
+        self.drop5 = nn.Dropout(param['drop_proba'][6])
+        self.fc5 = nn.Linear(90,2)        
         
         self.fcnaive = nn.Linear(2, 2)
         
         if param['activation'] == 'tanh':
-            self.activation = F.tanh
+            self.activation = torch.tanh
         elif param['activation'] == 'relu':
             self.activation = F.relu
         else :
@@ -250,7 +253,7 @@ class compNet4(nn.Module):
         elif param['pool'] == 'avg':
             self.pool = F.avg_pool2d
         else :
-            raise ValueError("Activation must be 'avg' or 'max'")
+            raise ValueError("Pooling must be 'avg' or 'max'")
         
     def forward(self, input_):        
         
@@ -269,14 +272,14 @@ class compNet4(nn.Module):
         y = self.activation(self.fc1(y.view(-1, 120)))
         y = self.fc2(y)
         
-        z = Variable(torch.cat([x, y], 1))
-        
-        z = F.relu(self.fc3(z))
-        z = F.relu(self.fc4(z))
-        z = self.fc5(z)
+#        z = Variable(torch.cat([x, y], 1))
+#        
+#        z = F.relu(self.fc3(self.drop3(z)))
+#        z = F.relu(self.fc4(self.drop4(z)))
+#        z = self.fc5(self.drop5(z))
         
         # Equivalent to the noive comparing digits method
-#        z = Variable(torch.stack([x.data.max(1)[1].float(), y.data.max(1)[1].float()], dim=1))
-#        z = self.fcnaive(z)
+        z = Variable(torch.stack([x.data.max(1)[1].float(), y.data.max(1)[1].float()], dim=1))
+        z = self.fcnaive(z)
         
         return x, y, z

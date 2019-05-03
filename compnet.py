@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 import xgboost as xgb
 from Proj1 import progress_bar, compare_digits, create_Net
 from Nets import *
+import logging
 
 N_PAIRS = 1000    
     
@@ -72,7 +73,7 @@ def test_model(model, test_input, test_target, test_class):
     return class_err, class_err /test_target.size(0) /2*100, comp_err, comp_err /test_target.size(0) *100
 
 
-def test_param(param):
+def test_param(param, save=False):
     
     print("Testing...", end='')
     for k in param.keys():
@@ -100,6 +101,21 @@ def test_param(param):
     print('Classification test error: {:0.2f}% {:d}/{:d}'.format(class_per, class_err, 2*N_PAIRS))
     
     print("Net comparison error: {:0.2f}% {:d}/{:d}".format(comp_per, comp_err, N_PAIRS))
+    
+    with open("{}results.log".format(param['net']), mode='at') as f:
+        f.write("Class error: {:.4}%, Comp error: {:.4}%\n".format(class_per, comp_per))
+            
+    if save:
+        if 'nets' not in os.listdir():
+                dir_ = 'nets'
+                try:  
+                    os.mkdir(dir_)
+                except OSError:  
+                    print ("Creation of the directory %s failed" % dir_)
+                else:  
+                    print ("Successfully created the directory %s " % dir_)
+                    
+        torch.save(model.state_dict(), "nets/{}.pkl".format(param['net']))
 
 
 def __main__():
@@ -108,9 +124,10 @@ def __main__():
     cnet2 = {"net": 'compNet2', "hidden": 120, "epochs": 80, "batch_size": 10, 
              "pool": 'max', "activation": 'relu', "drop_proba": [0.05, 0.05, 0.5, 0.2], "seed": None}
     cnet4 = {"net": 'compNet4', "hidden": 350, "epochs": 30, "batch_size": 10, 
-             "pool": 'max', "activation": 'tanh', "drop_proba": [0, 0, 0, 0.1], "seed": None}
-    
-    test_param(cnet4)
+             "pool": 'max', "activation": 'tanh', "drop_proba": [0, 0, 0, 0.2, 0, 0, 0], "seed": None}    
+        
+    for i in range(10):
+        test_param(cnet2, save=False)
 
 
 if __name__ == "__main__":

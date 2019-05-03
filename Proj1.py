@@ -128,16 +128,26 @@ def grid_search(param, optimize='epoch', rg=[10, 100], step=10, level=1):
                             Variable(train_class[:, i].long()), mini_batch_size, nb_epochs, progress=False)
         model.train(False)
         
-    def save_figure(x_plot, y_plot, legend, ax_labels, title, filename):        
+    def save_figure(x_plot, y_plot, legend, ax_labels, title, filename): 
         plt.figure(figsize=(5, 3))
         for i, y in enumerate(y_plot):
             plt.plot(x_plot, y, label=legend[i])            
         plt.legend()
         plt.xlabel(ax_labels[0]); plt.ylabel(ax_labels[1]);
+        
+        if 'figs' not in os.listdir():
+            dir_ = 'figs'
+            try:  
+                os.mkdir(dir_)
+            except OSError:  
+                print ("Creation of the directory %s failed" % dir_)
+            else:  
+                print ("Successfully created the directory %s " % dir_)
+                
         plt.savefig(os.path.join('figs', filename))
         plt.show()   
+     
         
-            
     # Imports the data  
     train_input, train_target, train_class, test_input, test_target, test_class = \
         prologue.generate_pair_sets(N_PAIRS)
@@ -334,9 +344,9 @@ def main():
     net5 =  {"net": 'LeNet5', "hidden": 250, "epochs": 30, "batch_size": 20, "pool": 'avg', "activation": 'tanh', "drop_proba": [0.0, 0.0, 0.2, 0.25, 0.15], "seed": 0}
     net5 =  {"net": 'LeNet5', "hidden": 120, "epochs": 30, "batch_size": 20, "pool": 'max', "activation": 'relu', "drop_proba": [0.0, 0.0, 0.0, 0.0], "seed": 0}
     
-#    grid_search(net4 ,optimize='epoch', rg=[10, 20], step=10)
+    grid_search(net4 ,optimize='epoch', rg=[10, 20], step=10)
 
-    test_param(net4)
+#    test_param(net4)
     
 #    nets = []
 #    for i in range(4):
