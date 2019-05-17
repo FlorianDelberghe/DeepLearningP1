@@ -227,13 +227,85 @@ class compNet5(nn.Module):
         return x, y, z
 
 
-class resNet(nn.Module):
     
-    def __init__():
-        raise NotImplementedError
+class ResBlock(nn.Module):
+    def __init__(self, nb_channels, kernel_size, drop_proba):
+        super(ResBlock, self).__init__()
+        self.conv1 = nn.Conv2d(nb_channels, nb_channels, kernel_size,
+        padding = (kernel_size-1)//2)
+        self.bn1 = nn.BatchNorm2d(nb_channels)
+        self.drop1 = nn.modules.Dropout2d(p=drop_proba[0])
+        self.conv2 = nn.Conv2d(nb_channels, nb_channels, kernel_size,
+        padding = (kernel_size-1)//2)
+        self.bn2 = nn.BatchNorm2d(nb_channels)
+        self.drop2 = nn.modules.Dropout2d(p=drop_proba[1])
+
+    def forward(self, x):
+        y = self.drop1(self.bn1(self.conv1(x)))
+        y = self.bn1(self.conv1(x))
+        y = F.relu(y)
+        y = self.drop2(self.bn2(self.conv2(y)))
+        y = self.bn2(self.conv2(y))
+        y += x
+        y = F.relu(y)
+        return y
+    
+class ResNet(nn.Module):
+    def __init__(self, param):
+        super(ResNet, self).__init__()
+        self.conv0 = nn.Conv2d(1, param['nb_channels'], kernel_size = 1)
+        self.resblocks = nn.Sequential(
+        *(ResBlock(param['nb_channels'], param['kernel_size'], 
+                   param['drop_proba']) for _ in range(param['nb_blocks']))
+        )
+        self.avg = nn.AvgPool2d(kernel_size = 28)
+        self.fc1 = nn.Linear(param['nb_channels'], 10)
+        self.drop1 = nn.Dropout(param['drop_proba'][2])
+        #the following layers are the comparison part of the network
         
-    def forward():
-        raise NotImplementedError
+                
+        self.naive = param['naive']
+        if self.naive:
+            # naive comp net
+            self.fcnaive = nn.Linear(2, 2)        
+        else:   
+            # fc net for comp
+            self.drop2 = nn.Dropout(param['drop_proba'][3])
+            self.fc2 = nn.Linear(20, 60)
+            self.drop3 = nn.Dropout(param['drop_proba'][4])
+            self.fc3 = nn.Linear(60, 90)
+            self.drop4 = nn.Dropout(param['drop_proba'][5])
+            self.fc4 = nn.Linear(90,2)
+            
+        
+    def forward(self, input_):
+        x = input_[:, 0, :, :].view(-1, 1, 14, 14)
+        y = input_[:, 1, :, :].view(-1, 1, 14, 14)
+        x = F.relu(self.conv0(x))
+        x = self.resblocks(x)
+        x = F.relu(self.avg(x))
+        x = x.view(x.size(0), -1)
+        x = self.drop1(self.fc1(x))
+
+        y = F.relu(self.conv0(y))
+        y = self.resblocks(y)
+        y = F.relu(self.avg(y))
+        y = y.view(y.size(0), -1)
+        y = self.drop1(self.fc1(y))      
+
+                
+        if self.naive:
+            # Equivalent to the noive comparing digits method
+            z = torch.stack([x.data.max(1)[1].float(), y.data.max(1)[1].float()], dim=1)
+            z = self.fcnaive(z)
+        else:
+            z = torch.cat([x, y], 1)         
+            z = F.relu(self.fc2(self.drop2(z)))
+            z = F.relu(self.fc3(self.drop3(z)))
+            z = self.fc4(self.drop4(z))       
+        
+        return x, y, z
+        
 
 
 def create_Net(param):
@@ -254,6 +326,8 @@ def create_Net(param):
         return compNet4(param)
     elif param['net'] == 'compNet5':
         return compNet5(param)
+    elif param['net'] == 'ResNet':
+        return ResNet(param)
     else:
         raise NotImplementedError
 
